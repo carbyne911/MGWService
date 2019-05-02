@@ -1309,6 +1309,26 @@ int janus_http_handler(void *cls, struct MHD_Connection *connection, const char 
 		goto parsingdone;
 	}
 
+        if(session_path != NULL && !strcmp(session_path, "healthcheck")) {
+                /* The info REST endpoint, if contacted through a GET, provides information on the Janus core */
+                if(strcasecmp(method, "GET")) {
+                        response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
+                        janus_http_add_cors_headers(msg, response);
+                        ret = MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response);
+                        MHD_destroy_response(response);
+                        goto done;
+                }
+                /* Turn this into a fake "keepalive" request */
+                method = "POST";
+                char tr[12];
+                janus_http_random_string(12, (char *)&tr);
+                root = json_object();
+                json_object_set_new(root, "janus", json_string("healthcheck"));
+                json_object_set_new(root, "transaction", json_string(tr));
+                goto parsingdone;
+        }
+
+
 	/* Or maybe a long poll */
 	if(!strcasecmp(method, "GET") || !payload) {
 		session_id = session_path ? g_ascii_strtoull(session_path, NULL, 10) : 0;
