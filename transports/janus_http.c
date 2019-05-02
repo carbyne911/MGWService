@@ -1309,7 +1309,7 @@ int janus_http_handler(void *cls, struct MHD_Connection *connection, const char 
 		goto parsingdone;
 	}
 
-        if(session_path != NULL && !strcmp(session_path, "healthcheck")) {
+        if(session_path != NULL && !strcasecmp(session_path, "healthcheck")) {
                 /* The info REST endpoint, if contacted through a GET, provides information on the Janus core */
                 if(strcasecmp(method, "GET")) {
                         response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
