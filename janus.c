@@ -831,6 +831,12 @@ int janus_process_incoming_request(janus_request *request) {
 			ret = janus_process_success(request, janus_info(transaction_text));
 			goto jsondone;
 		}
+                if(!strcasecmp(message_text, "healthcheck")) {
+                        /* Prepare JSON reply */
+                        json_t *reply = janus_create_message("200", 0, transaction_text);
+                        ret = janus_process_success(request, reply);
+                        goto jsondone;
+                }
 		if(!strcasecmp(message_text, "ping")) {
 			/* Prepare JSON reply */
 			json_t *reply = janus_create_message("pong", 0, transaction_text);
