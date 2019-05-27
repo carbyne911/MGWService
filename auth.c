@@ -38,11 +38,17 @@ static GHashTable *tokens = NULL, *allowed_plugins = NULL;
 static gboolean auth_enabled = FALSE;
 static janus_mutex mutex;
 static char *auth_secret = NULL;
-
+static char *shc_auth_secret = NULL;//Sanity HealthCheck secret
 static void janus_auth_free_token(char *token) {
 	g_free(token);
 }
-
+static  void set_string_url_safe(char *str){
+      for(int i=0;i<strlen(str);i++){
+        if(str[i]=='/') str[i]='_';
+        if(str[i]=='+') str[i]='-';
+        if(str[i]=='=') str[i]=0;
+       }
+}
 /* Setup */
 void janus_auth_init(gboolean enabled, const char *secret) {
 	if(enabled) {
@@ -62,6 +68,16 @@ void janus_auth_init(gboolean enabled, const char *secret) {
 	janus_mutex_init(&mutex);
 }
 
+void janus_sanityhealthcheck_auth_init(const char *secret)
+{
+       if(secret == NULL) {
+          JANUS_LOG(LOG_WARN, "SanityHealthChek -Token based authentication enabled use default secretjanus\n");
+          shc_auth_secret =g_strdup("secretjanus"); 
+        } else {
+          JANUS_LOG(LOG_WARN, "Signed-Token based authentication enabled, use secret: %s\n", secret);
+          shc_auth_secret = g_strdup(secret);
+        }
+}
 gboolean janus_auth_is_enabled(void) {
 	return auth_enabled;
 }
@@ -82,6 +98,42 @@ void janus_auth_deinit(void) {
 	auth_secret = NULL;
 	janus_mutex_unlock(&mutex);
 }
+
+
+gboolean janus_auth_healthcheck_signature(const char *token) {
+        if ( shc_auth_secret == NULL)
+                return FALSE;
+        gsize out_len=0;
+        unsigned char padded[512];
+        g_snprintf(padded, sizeof(padded), "%s====",token);
+        gchar *cleartoken=(gchar *)g_base64_decode ((const gchar *)padded, &out_len);
+
+        gchar **parts = g_strsplit(cleartoken, ":", 5);
+
+        if(!parts[0] || !parts[1] || !parts[2] || !parts[3] || parts[4])
+                goto fail;
+
+        unsigned char message[512];
+        g_snprintf(message, sizeof(message), "%s:%s:%s", parts[0],parts[1],parts[2]);
+
+        /* Verify HMAC-SHA256 */
+        unsigned char signature[EVP_MAX_MD_SIZE];
+        unsigned int len=0;
+        HMAC(EVP_sha256(), shc_auth_secret, strlen(shc_auth_secret), (const unsigned char*)message, strlen(message), signature, &len);
+        gchar *base64 = g_base64_encode(signature, len);
+        set_string_url_safe(base64);
+        gboolean result = janus_strcmp_const_time(parts[3], base64);
+
+        g_free(cleartoken);
+        g_strfreev(parts);
+        g_free(base64);
+        return result;
+fail:
+        g_free(cleartoken);
+        g_strfreev(parts);
+        return FALSE;
+}
+ /* End of Healthcheck procedure*/
 
 gboolean janus_auth_check_signature(const char *token, const char *realm) {
 	if (!auth_enabled || auth_secret == NULL)
