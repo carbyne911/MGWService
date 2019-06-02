@@ -37,6 +37,7 @@
 #include "auth.h"
 #include "record.h"
 #include "events.h"
+#include <sys/statvfs.h>
 
 
 #define JANUS_NAME				"Janus WebRTC Server"
@@ -2666,7 +2667,22 @@ gboolean janus_transport_is_sanityhealthcheck_token_valid(janus_transport *plugi
 }
 
 gboolean janus_transport_is_sanityhealthcheck_resources_available(janus_transport *plugin) {
-                return TRUE;
+//PVL  
+  struct statvfs stat;
+  const char* path="/";
+  int diskSpaceThreshold=10;
+  if (statvfs(path, &stat) < 0) {
+    // error happens, just quits here
+    JANUS_LOG(LOG_ERR, "Invalid request to statvfs\n");
+    return FALSE;
+  }
+  long precent = stat.f_bavail * 100 / stat.f_blocks * stat.f_bsize / stat.f_frsize;
+  // the available size is f_bsize * f_bavail
+  if( precent < diskSpaceThreshold) {
+     JANUS_LOG(LOG_ERR, "Available Disk for path:%s  precent %ld is less than threshold:%d \n",path,precent, diskSpaceThreshold);  
+     return FALSE; 
+  }
+  return TRUE;
 }
 
 
