@@ -1308,7 +1308,49 @@ int janus_http_handler(void *cls, struct MHD_Connection *connection, const char 
 		json_object_set_new(root, "transaction", json_string(tr));
 		goto parsingdone;
 	}
+        if(session_path != NULL && !strcasecmp(session_path, "sanityhealthcheck")) {
+                /* The info REST endpoint, if contacted through a GET, provides information on the Janus core */
+                gboolean token_not_valid = TRUE;
+                gboolean no_resources = TRUE;
+                if(strcasecmp(method, "GET")) {
+                        response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
+                        janus_http_add_cors_headers(msg, response);
+                        ret = MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response); //400
+                        MHD_destroy_response(response);
+                        goto done;
+                }
+                const char *token = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "credentials");
+                JANUS_LOG(LOG_VERB, " SanityHealthCheck credentials= %s\n", token);
+                if(gateway->is_sanityhealthcheck_token_valid(&janus_http_transport, token)) {
+                                /* Token is valid */
+                                token_not_valid = FALSE;
+                }
+                if (token_not_valid) {
+                         response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
+                        janus_http_add_cors_headers(msg, response);
+                        ret = MHD_queue_response(connection, MHD_HTTP_UNAUTHORIZED, response); //401
+                        MHD_destroy_response(response);
+                        goto done;
+                 }
+                if(gateway->is_sanityhealthcheck_resources_available(&janus_http_transport)) {
+                                /* resources available */
+                                no_resources = FALSE;
+                }
+                 if (no_resources) {
+                         response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
+                        janus_http_add_cors_headers(msg, response);
+                        ret = MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, response); //500
+                        MHD_destroy_response(response);
+                        goto done;
+                 }
 
+                 response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
+                 janus_http_add_cors_headers(msg, response);
+                 ret = MHD_queue_response(connection, MHD_HTTP_OK, response); //200
+                 MHD_destroy_response(response);
+                 goto done;
+
+        }
         if(session_path != NULL && !strcasecmp(session_path, "healthcheck")) {
                 /* The info REST endpoint, if contacted through a GET, provides information on the Janus core */
                 if(strcasecmp(method, "GET")) {

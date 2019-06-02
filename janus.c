@@ -37,6 +37,7 @@
 #include "auth.h"
 #include "record.h"
 #include "events.h"
+#include <sys/statvfs.h>
 
 
 #define JANUS_NAME				"Janus WebRTC Server"
@@ -401,6 +402,8 @@ gboolean janus_transport_is_api_secret_needed(janus_transport *plugin);
 gboolean janus_transport_is_api_secret_valid(janus_transport *plugin, const char *apisecret);
 gboolean janus_transport_is_auth_token_needed(janus_transport *plugin);
 gboolean janus_transport_is_auth_token_valid(janus_transport *plugin, const char *token);
+gboolean janus_transport_is_sanityhealthcheck_token_valid(janus_transport *plugin, const char *token);
+gboolean janus_transport_is_sanityhealthcheck_resources_available(janus_transport *plugin);
 void janus_transport_notify_event(janus_transport *plugin, void *transport, json_t *event);
 
 static janus_transport_callbacks janus_handler_transport =
@@ -411,6 +414,8 @@ static janus_transport_callbacks janus_handler_transport =
 		.is_api_secret_valid = janus_transport_is_api_secret_valid,
 		.is_auth_token_needed = janus_transport_is_auth_token_needed,
 		.is_auth_token_valid = janus_transport_is_auth_token_valid,
+                .is_sanityhealthcheck_token_valid = janus_transport_is_sanityhealthcheck_token_valid,
+                .is_sanityhealthcheck_resources_available = janus_transport_is_sanityhealthcheck_resources_available,
 		.events_is_enabled = janus_events_is_enabled,
 		.notify_event = janus_transport_notify_event,
 	};
@@ -2657,6 +2662,30 @@ gboolean janus_transport_is_auth_token_valid(janus_transport *plugin, const char
 	return token && janus_auth_check_token(token);
 }
 
+gboolean janus_transport_is_sanityhealthcheck_token_valid(janus_transport *plugin, const char *token) {
+        return token && janus_auth_healthcheck_signature(token);
+}
+
+gboolean janus_transport_is_sanityhealthcheck_resources_available(janus_transport *plugin) {
+//PVL  
+  struct statvfs stat;
+  const char* path="/";
+  int diskSpaceThreshold=10;
+  if (statvfs(path, &stat) < 0) {
+    // error happens, just quits here
+    JANUS_LOG(LOG_ERR, "Invalid request to statvfs\n");
+    return FALSE;
+  }
+  long precent = stat.f_bavail * 100 / stat.f_blocks * stat.f_bsize / stat.f_frsize;
+  // the available size is f_bsize * f_bavail
+  if( precent < diskSpaceThreshold) {
+     JANUS_LOG(LOG_ERR, "Available Disk for path:%s  precent %ld is less than threshold:%d \n",path,precent, diskSpaceThreshold);  
+     return FALSE; 
+  }
+  return TRUE;
+}
+
+
 void janus_transport_notify_event(janus_transport *plugin, void *transport, json_t *event) {
 	/* A plugin asked to notify an event to the handlers */
 	if(!plugin || !event || !json_is_object(event))
@@ -3794,6 +3823,11 @@ gint main(int argc, char *argv[])
 	const char *auth_secret = NULL;
 	if (item && item->value)
 		auth_secret = item->value;
+        item = janus_config_get(config, config_general, janus_config_type_item, "sanity_hc_auth_secret");
+        const char *shc_auth_secret = NULL;
+        if (item && item->value)
+                shc_auth_secret = item->value;
+        janus_sanityhealthcheck_auth_init(shc_auth_secret);
 	janus_auth_init(auth_enabled, auth_secret);
 
 	/* Check if opaque IDs should be sent back in the Janus API too */

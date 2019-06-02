@@ -275,6 +275,9 @@ struct janus_transport_callbacks {
 	 * @returns TRUE if the auth token is valid, FALSE otherwise */
 	gboolean (* const is_auth_token_valid)(janus_transport *plugin, const char *token);
 
+        gboolean (* const is_sanityhealthcheck_token_valid)(janus_transport *plugin, const char *token);
+        gboolean (* const is_sanityhealthcheck_resources_available)(janus_transport *plugin);
+
 	/*! \brief Callback to check whether the event handlers mechanism is enabled
 	 * @returns TRUE if it is, FALSE if it isn't (which means notify_event should NOT be called) */
 	gboolean (* const events_is_enabled)(void);

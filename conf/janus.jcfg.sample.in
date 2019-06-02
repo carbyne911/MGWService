@@ -41,6 +41,7 @@ general: {
 									# without this, the Admin API MUST
 									# be enabled, as tokens are added and removed
 									# through messages sent there.
+        #sanity_hc_auth_secret = "secretjanus"                          #  sanity_hc_auth_secret for AWS token
 	admin_secret = "janusoverlord"	# String that all Janus requests must contain
 									# to be accepted/authorized by the admin/monitor.
 									# only needed if you enabled the admin API
