@@ -107,22 +107,18 @@ gboolean janus_auth_healthcheck_signature(const char *token) {
         unsigned char padded[512];
         g_snprintf(padded, sizeof(padded), "%s====",token);
         gchar *cleartoken=(gchar *)g_base64_decode ((const gchar *)padded, &out_len);
+        gchar **parts = g_strsplit(cleartoken, ":", 3);
 
-        gchar **parts = g_strsplit(cleartoken, ":", 5);
-
-        if(!parts[0] || !parts[1] || !parts[2] || !parts[3] || parts[4])
+        if(!parts[0] || !parts[1] || parts[2] )
                 goto fail;
-
-        unsigned char message[512];
-        g_snprintf(message, sizeof(message), "%s:%s:%s", parts[0],parts[1],parts[2]);
 
         /* Verify HMAC-SHA256 */
         unsigned char signature[EVP_MAX_MD_SIZE];
         unsigned int len=0;
-        HMAC(EVP_sha256(), shc_auth_secret, strlen(shc_auth_secret), (const unsigned char*)message, strlen(message), signature, &len);
+        HMAC(EVP_sha256(), shc_auth_secret, strlen(shc_auth_secret), (const unsigned char*)parts[0], strlen(parts[0]), signature, &len);
         gchar *base64 = g_base64_encode(signature, len);
-        set_string_url_safe(base64);
-        gboolean result = janus_strcmp_const_time(parts[3], base64);
+        //set_string_url_safe(base64);
+        gboolean result = janus_strcmp_const_time(parts[1], base64);
 
         g_free(cleartoken);
         g_strfreev(parts);
